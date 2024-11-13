@@ -1,8 +1,14 @@
 package repository
 
-import "github.com/jmoiron/sqlx"
+import (
+	"github.com/Perseverance7/grady/internal/models"
+	"github.com/jmoiron/sqlx"
+)
 
 type Authorization interface {
+	CreateUser(input models.UserRegister) (int, error)
+	GetUserSalt(email string) (string, error)
+	GetUser(email, password string) (int, error)
 }
 
 type Task interface {

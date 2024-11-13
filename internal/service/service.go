@@ -1,10 +1,13 @@
 package service
 
 import (
+	"github.com/Perseverance7/grady/internal/models"
 	"github.com/Perseverance7/grady/internal/repository"
 )
 
 type Authorization interface {
+	CreateUser(input models.UserRegister) (int, error)
+	GenerateToken(email, password string) (string, error) 
 }
 
 type Task interface {
