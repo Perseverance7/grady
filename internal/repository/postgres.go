@@ -7,6 +7,18 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const (
+	tableUsers           = "users"
+	tableGroup           = "groups"
+	tableGroupMembers    = "group_members"
+	tableTests           = "tests"
+	tableQuestions       = "questions"
+	tableAnswerOptions   = "answer_options"
+	tableTestSubmissions = "test_submissions"
+	tableStudentAnswers  = "student_answers"
+	tableMessages        = "messages"
+)
+
 type Config struct {
 	Host     string
 	Port     string
