@@ -7,7 +7,7 @@ import (
 
 type Authorization interface {
 	CreateUser(input models.UserRegister) (int, error)
-	GenerateToken(email, password string) (string, error) 
+	GenerateTokens(email, password string) (string, string, error)
 }
 
 type Task interface {
