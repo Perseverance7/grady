@@ -4,10 +4,11 @@ import (
 	"net/http"
 
 	"github.com/Perseverance7/grady/internal/models"
+	"github.com/Perseverance7/grady/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
-func(h *Handler) register(c *gin.Context){
+func (h *Handler) register(c *gin.Context) {
 	var input models.UserRegister
 
 	if err := c.BindJSON(&input); err != nil {
@@ -26,24 +27,35 @@ func(h *Handler) register(c *gin.Context){
 	})
 }
 
-func(h *Handler) login(c *gin.Context){
+func (h *Handler) login(c *gin.Context) {
 	var input models.UserLogin
+
+	// Парсинг JSON-запроса с данными пользователя
 	if err := c.BindJSON(&input); err != nil {
 		newErrorResponce(c, http.StatusBadRequest, "invalid input body")
 		return
 	}
 
-	token, err := h.services.GenerateToken(input.Email, input.Password)
+	// Генерация access и refresh токенов
+	accessToken, refreshToken, err := h.services.GenerateTokens(input.Email, input.Password)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
 
-	c.JSON(http.StatusOK, map[string]interface{}{
-		"token": token,
+	// Опционально: установка токенов в HttpOnly cookies
+	c.SetCookie("access_token", accessToken, int(service.AccessExpiry.Seconds()), "/", "", false, true)
+	c.SetCookie("refresh_token", refreshToken, int(service.RefreshExpiry.Seconds()), "/", "", false, true)
+
+	// Возвращаем токены в JSON-ответе
+	c.JSON(http.StatusOK, map[string]string{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
 	})
 }
 
-func(h *Handler) logout(c *gin.Context){
-	
+
+func (h *Handler) logout(c *gin.Context) {
+
 }
+

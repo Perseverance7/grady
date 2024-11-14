@@ -15,17 +15,17 @@ import (
 	"github.com/Perseverance7/grady/internal/repository"
 )
 
-const (
-	tokenTTL = 12 * time.Hour
-)
-
 var (
-	signingKey = os.Getenv("SIGNING_KEY")
+	accessSecret  = []byte(os.Getenv("ACCESS_SECRET"))
+	refreshSecret = []byte(os.Getenv("REFRESH_SECRET"))
+
+	AccessExpiry  = time.Minute * 15   // Access token живет 15 минут
+	RefreshExpiry = time.Hour * 24 * 7 // Refresh token живет 7 дней
 )
 
 type TokenClaims struct {
 	jwt.StandardClaims
-	UserId int `json:"user_id"`
+	UserID int `json:"user_id"`
 }
 
 type AuthService struct {
@@ -57,29 +57,48 @@ func (a *AuthService) CreateUser(user models.UserRegister) (int, error) {
 	return id, nil
 }
 
-func (a *AuthService) GenerateToken(email, password string) (string, error) {
+func (a *AuthService) GenerateTokens(email, password string) (string, string, error) {
 	salt, err := a.repo.GetUserSalt(email)
-
 	if err != nil {
-		return "", errors.New("invalid login or password")
-	} else {
-		id, err := a.repo.GetUser(email, HashPassword(password, salt))
-		if err != nil {
-			return "", errors.New("invalid login or password")
-		}
-
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, &TokenClaims{
-			jwt.StandardClaims{
-				ExpiresAt: time.Now().Add(tokenTTL).Unix(),
-				IssuedAt:  time.Now().Unix(),
-			},
-			id,
-		})
-
-		return token.SignedString([]byte(signingKey))
+		return "", "", errors.New("invalid login or password")
 	}
 
+	id, err := a.repo.GetUser(email, HashPassword(password, salt))
+	if err != nil {
+		return "", "", errors.New("invalid login or password")
+	}
+
+	// Создание access token с коротким сроком действия
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, &TokenClaims{
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(AccessExpiry).Unix(), // Access token истекает быстро
+			IssuedAt:  time.Now().Unix(),
+		},
+		UserID: id,
+	})
+
+	accessTokenString, err := accessToken.SignedString(accessSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Создание refresh token с более длинным сроком действия
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, &TokenClaims{
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(RefreshExpiry).Unix(), // Refresh token живет дольше
+			IssuedAt:  time.Now().Unix(),
+		},
+		UserID: id,
+	})
+
+	refreshTokenString, err := refreshToken.SignedString(refreshSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessTokenString, refreshTokenString, nil
 }
+
 
 func GenerateSalt() (string, error) {
 	salt := make([]byte, 16)
