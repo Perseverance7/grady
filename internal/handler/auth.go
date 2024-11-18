@@ -42,13 +42,13 @@ func (h *Handler) login(c *gin.Context) {
 		return
 	}
 
-	accessToken, accessClaims, err := h.tokenMaker.CreateToken(user.ID, user.Email, user.IsAdmin, 15*time.Minute)
+	accessToken, accessClaims, err := h.services.CreateToken(user.ID, user.Email, user.IsAdmin, 15*time.Minute)
 	if err != nil {
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	refreshToken, refreshClaims, err := h.tokenMaker.CreateToken(user.ID, user.Email, user.IsAdmin, 24*time.Hour)
+	refreshToken, refreshClaims, err := h.services.CreateToken(user.ID, user.Email, user.IsAdmin, 24*time.Hour)
 	if err != nil {
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
 		return
@@ -114,7 +114,7 @@ func (h *Handler) renewAccessToken(c *gin.Context) {
 		return
 	}
 
-	refreshClaims, err := h.tokenMaker.VerifyToken(req.RefreshToken)
+	refreshClaims, err := h.services.VerifyToken(req.RefreshToken)
 	if err != nil {
 		newErrorResponce(c, http.StatusUnauthorized, "token verification failed")
 		return
@@ -136,7 +136,7 @@ func (h *Handler) renewAccessToken(c *gin.Context) {
 		return
 	}
 
-	accessToken, accessClaims, err := h.tokenMaker.CreateToken(refreshClaims.ID, refreshClaims.Email, refreshClaims.IsAdmin, 15*time.Minute)
+	accessToken, accessClaims, err := h.services.CreateToken(refreshClaims.ID, refreshClaims.Email, refreshClaims.IsAdmin, 15*time.Minute)
 	if err != nil{
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
 		return 
@@ -190,7 +190,7 @@ func (h *Handler) authMiddleware() gin.HandlerFunc {
         accessToken := parts[1]
 
         // Проверяем валидность токена
-        payload, err := h.tokenMaker.VerifyToken(accessToken)
+        payload, err := h.services.VerifyToken(accessToken)
         if err != nil {
             newErrorResponce(c, http.StatusUnauthorized, fmt.Sprintf("invalid token: %v", err))
             c.Abort()

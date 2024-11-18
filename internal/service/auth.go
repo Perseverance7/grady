@@ -5,21 +5,24 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
-
+	"time"
 
 	"github.com/Perseverance7/grady/internal/models"
 	"github.com/Perseverance7/grady/internal/repository"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-
 type AuthService struct {
-	repo repository.Authorization
+	repo      repository.Authorization
+	secretKey []byte
 }
 
-func NewAuthService(repo repository.Authorization) *AuthService {
+func NewAuthService(repo repository.Authorization, secretKey []byte) *AuthService {
 	return &AuthService{
 		repo: repo,
+		secretKey: secretKey,
 	}
 }
 
@@ -44,12 +47,12 @@ func (a *AuthService) CreateUser(userReq models.UserRegisterReq) (models.UserReg
 
 func (a *AuthService) GetUser(email, password string) (models.UserLogin, error) {
 	salt, err := a.repo.GetUserSalt(email)
-	if err != nil{
+	if err != nil {
 		return models.UserLogin{}, err
 	}
 
 	user, err := a.repo.GetUser(email, HashPassword(password, salt))
-	if err != nil{
+	if err != nil {
 		return models.UserLogin{}, err
 	}
 
@@ -60,8 +63,46 @@ func (a *AuthService) UpdateUser(user *models.User) (*models.User, error) {
 	return a.repo.UpdateUser(user)
 }
 
-func (a *AuthService) DeleteUser(id int64) error{
+func (a *AuthService) DeleteUser(id int64) error {
 	return a.repo.DeleteUser(id)
+}
+
+func (a *AuthService) CreateToken(id int64, email string, isAdmin bool, duration time.Duration) (string, *models.UserClaims, error) {
+	claims, err := models.NewUserClaims(id, email, isAdmin, duration)
+	if err != nil {
+		return "", nil, err
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString(a.secretKey)
+	if err != nil {
+		return "", nil, fmt.Errorf("error signing token: %s", err)
+	}
+
+	return tokenStr, claims, nil
+
+}
+
+func (a *AuthService) VerifyToken(tokenStr string) (*models.UserClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &models.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		_, ok := token.Method.(*jwt.SigningMethodHMAC)
+		if !ok {
+			return nil, fmt.Errorf("invalid token signing method")
+		}
+
+		return a.secretKey, nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error parsing tokens: %w", err)
+	}
+
+	claims, ok := token.Claims.(*models.UserClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims")
+	}
+
+	return claims, nil
 }
 
 func (a *AuthService) CreateSession(session *models.Session) (*models.Session, error) {

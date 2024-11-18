@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	var secretKey = os.Getenv("SECRET_KEY")
+	var secretKey = []byte(os.Getenv("SECRET_KEY"))
 
 	logrus.SetFormatter(new(logrus.JSONFormatter))
 
@@ -39,8 +39,8 @@ func main() {
 	}
 
 	repo := repository.NewRepository(db)
-	services := service.NewService(repo)
-	handlers := handler.NewHandler(services, secretKey)
+	services := service.NewService(repo, secretKey)
+	handlers := handler.NewHandler(services)
 
 	srv := new(models.Server)
 
