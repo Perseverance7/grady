@@ -52,7 +52,7 @@ type UserLoginRes struct {
 }
 
 type RenewAccessTokenReq struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshTokenUUID string `json:"refresh_token_uuid"`
 }
 
 type RenewAccessTokenRes struct {

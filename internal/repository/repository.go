@@ -9,6 +9,7 @@ type Authorization interface {
 	CreateUser(input models.UserRegisterReq) (models.UserRegisterRes, error)
 	GetUser(email, password string) (models.UserLogin, error)
 	GetUserSalt(email string) (string, error)
+	GetRefreshToken(id string) (string, error)
 	UpdateUser(user *models.User) (*models.User, error)
 	DeleteUser(id int64) error 
 	CreateSession(session *models.Session) (*models.Session, error)

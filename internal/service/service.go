@@ -12,7 +12,8 @@ type Authorization interface {
 	GetUser(email, password string) (models.UserLogin, error)
 	UpdateUser(user *models.User) (*models.User, error)
 	CreateToken(id int64, email string, isAdmin bool, duration time.Duration) (string, *models.UserClaims, error)
-	VerifyToken(tokenStr string) (*models.UserClaims, error)
+	VerifyAccessToken(tokenStr string) (*models.UserClaims, error)
+	VerifyRefreshToken(refreshTokenUUID string) (*models.UserClaims, error)
 	CreateSession(session *models.Session) (*models.Session, error)
 	GetSession(id string) (*models.Session, error)
 	RevokeSession(id string) error

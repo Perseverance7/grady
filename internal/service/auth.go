@@ -83,7 +83,34 @@ func (a *AuthService) CreateToken(id int64, email string, isAdmin bool, duration
 
 }
 
-func (a *AuthService) VerifyToken(tokenStr string) (*models.UserClaims, error) {
+func (a *AuthService) VerifyAccessToken(tokenStr string) (*models.UserClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &models.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		_, ok := token.Method.(*jwt.SigningMethodHMAC)
+		if !ok {
+			return nil, fmt.Errorf("invalid token signing method")
+		}
+
+		return a.secretKey, nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error parsing tokens: %w", err)
+	}
+
+	claims, ok := token.Claims.(*models.UserClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims")
+	}
+
+	return claims, nil
+}
+
+func (a *AuthService) VerifyRefreshToken(refreshTokenUUID string) (*models.UserClaims, error) {
+	tokenStr, err := a.repo.GetRefreshToken(refreshTokenUUID)
+	if err != nil{
+		return nil, err
+	}
+
 	token, err := jwt.ParseWithClaims(tokenStr, &models.UserClaims{}, func(token *jwt.Token) (interface{}, error) {
 		_, ok := token.Method.(*jwt.SigningMethodHMAC)
 		if !ok {
