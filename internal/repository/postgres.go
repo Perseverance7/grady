@@ -9,7 +9,7 @@ import (
 
 const (
 	tableUsers           = "users"
-	tableGroup           = "groups"
+	tableGroups          = "groups"
 	tableGroupMembers    = "group_members"
 	tableTests           = "tests"
 	tableQuestions       = "questions"
@@ -17,6 +17,7 @@ const (
 	tableTestSubmissions = "test_submissions"
 	tableStudentAnswers  = "student_answers"
 	tableMessages        = "messages"
+	tableSessions        = "sessions"
 )
 
 type Config struct {
