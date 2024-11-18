@@ -6,9 +6,15 @@ import (
 )
 
 type Authorization interface {
-	CreateUser(input models.UserRegister) (int, error)
+	CreateUser(input models.UserRegisterReq) (models.UserRegisterRes, error)
+	GetUser(email, password string) (models.UserLogin, error)
 	GetUserSalt(email string) (string, error)
-	GetUser(email, password string) (int, error)
+	UpdateUser(user *models.User) (*models.User, error)
+	DeleteUser(id int64) error 
+	CreateSession(session *models.Session) (*models.Session, error)
+	GetSession(id string) (*models.Session, error)
+	RevokeSession(id string) error
+	DeleteSession(id string) error
 }
 
 type Task interface {

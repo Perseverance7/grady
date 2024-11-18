@@ -5,28 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"os"
 	"strings"
-	"time"
 
-	"github.com/dgrijalva/jwt-go"
 
 	"github.com/Perseverance7/grady/internal/models"
 	"github.com/Perseverance7/grady/internal/repository"
 )
 
-var (
-	accessSecret  = []byte(os.Getenv("ACCESS_SECRET"))
-	refreshSecret = []byte(os.Getenv("REFRESH_SECRET"))
-
-	AccessExpiry  = time.Minute * 15   // Access token живет 15 минут
-	RefreshExpiry = time.Hour * 24 * 7 // Refresh token живет 7 дней
-)
-
-type TokenClaims struct {
-	jwt.StandardClaims
-	UserID int `json:"user_id"`
-}
 
 type AuthService struct {
 	repo repository.Authorization
@@ -38,67 +23,62 @@ func NewAuthService(repo repository.Authorization) *AuthService {
 	}
 }
 
-func (a *AuthService) CreateUser(user models.UserRegister) (int, error) {
+func (a *AuthService) CreateUser(userReq models.UserRegisterReq) (models.UserRegisterRes, error) {
 	var err error
 
-	user.Salt, err = GenerateSalt()
+	userReq.Salt, err = GenerateSalt()
 	if err != nil {
-		return 0, err
+		return models.UserRegisterRes{}, err
 	}
 
-	user.Password = HashPassword(user.Password, user.Salt)
-	id, err := a.repo.CreateUser(user)
+	userReq.Password = HashPassword(userReq.Password, userReq.Salt)
+	userRes, err := a.repo.CreateUser(userReq)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"users_username_key\"") {
-			return 0, errors.New("user already exists")
+			return models.UserRegisterRes{}, errors.New("user already exists")
 		}
-		return 0, errors.New(err.Error())
+		return models.UserRegisterRes{}, errors.New(err.Error())
 	}
-	return id, nil
+	return userRes, nil
 }
 
-func (a *AuthService) GenerateTokens(email, password string) (string, string, error) {
+func (a *AuthService) GetUser(email, password string) (models.UserLogin, error) {
 	salt, err := a.repo.GetUserSalt(email)
-	if err != nil {
-		return "", "", errors.New("invalid login or password")
+	if err != nil{
+		return models.UserLogin{}, err
 	}
 
-	id, err := a.repo.GetUser(email, HashPassword(password, salt))
-	if err != nil {
-		return "", "", errors.New("invalid login or password")
+	user, err := a.repo.GetUser(email, HashPassword(password, salt))
+	if err != nil{
+		return models.UserLogin{}, err
 	}
 
-	// Создание access token с коротким сроком действия
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, &TokenClaims{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(AccessExpiry).Unix(), // Access token истекает быстро
-			IssuedAt:  time.Now().Unix(),
-		},
-		UserID: id,
-	})
-
-	accessTokenString, err := accessToken.SignedString(accessSecret)
-	if err != nil {
-		return "", "", err
-	}
-
-	// Создание refresh token с более длинным сроком действия
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, &TokenClaims{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(RefreshExpiry).Unix(), // Refresh token живет дольше
-			IssuedAt:  time.Now().Unix(),
-		},
-		UserID: id,
-	})
-
-	refreshTokenString, err := refreshToken.SignedString(refreshSecret)
-	if err != nil {
-		return "", "", err
-	}
-
-	return accessTokenString, refreshTokenString, nil
+	return user, nil
 }
 
+func (a *AuthService) UpdateUser(user *models.User) (*models.User, error) {
+	return a.repo.UpdateUser(user)
+}
+
+func (a *AuthService) DeleteUser(id int64) error{
+	return a.repo.DeleteUser(id)
+}
+
+func (a *AuthService) CreateSession(session *models.Session) (*models.Session, error) {
+	return a.repo.CreateSession(session)
+}
+
+func (a *AuthService) GetSession(id string) (*models.Session, error) {
+	return a.repo.GetSession(id)
+}
+
+func (a *AuthService) RevokeSession(id string) error {
+	return a.repo.RevokeSession(id)
+}
+
+func (a *AuthService) DeleteSession(id string) error {
+	return a.repo.DeleteSession(id)
+}
 
 func GenerateSalt() (string, error) {
 	salt := make([]byte, 16)

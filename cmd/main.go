@@ -17,6 +17,8 @@ import (
 )
 
 func main() {
+	var secretKey = os.Getenv("SECRET_KEY")
+
 	logrus.SetFormatter(new(logrus.JSONFormatter))
 
 	if err := godotenv.Load(); err != nil {
@@ -38,7 +40,7 @@ func main() {
 
 	repo := repository.NewRepository(db)
 	services := service.NewService(repo)
-	handlers := handler.NewHandler(services)
+	handlers := handler.NewHandler(services, secretKey)
 
 	srv := new(models.Server)
 
