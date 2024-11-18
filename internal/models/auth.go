@@ -1,4 +1,4 @@
-package token
+package models
 
 import (
 	"fmt"
@@ -7,6 +7,20 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
+
+type Session struct {
+	ID           string    `db:"id"`
+	UserEmail    string    `db:"user_email"`
+	RefreshToken string    `db:"refresh_token"`
+	IsRevoked    bool      `db:"is_revoked"`
+	CreatedAt    time.Time `db:"created_at"`
+	ExpiresAt    time.Time `db:"expires_at"`
+}
+
+type LogoutRequest struct {
+	SessionID string `json:"session_id"`
+}
+
 
 type UserClaims struct {
 	ID      int64  `json:"id"`

@@ -17,14 +17,13 @@ import (
 )
 
 func main() {
-	var secretKey = os.Getenv("SECRET_KEY")
-
+	
 	logrus.SetFormatter(new(logrus.JSONFormatter))
-
+	
 	if err := godotenv.Load(); err != nil {
 		logrus.Fatalf("error with loading env variables: %s", err.Error())
 	}
-
+	
 	db, err := repository.NewPostgresDB(&repository.Config{
 		Host:     os.Getenv("DB_HOST"),
 		Port:     os.Getenv("DB_PORT"),
@@ -33,14 +32,16 @@ func main() {
 		DBName:   os.Getenv("DB_NAME"),
 		SSLMode:  os.Getenv("DB_SSL_MODE"),
 	})
-
+	
 	if err != nil {
 		logrus.Fatalf("db connect error %s", err.Error())
 	}
-
+	
+	var secretKey = []byte(os.Getenv("SECRET_KEY"))
+	
 	repo := repository.NewRepository(db)
-	services := service.NewService(repo)
-	handlers := handler.NewHandler(services, secretKey)
+	services := service.NewService(repo, secretKey)
+	handlers := handler.NewHandler(services)
 
 	srv := new(models.Server)
 

@@ -42,13 +42,13 @@ func (h *Handler) login(c *gin.Context) {
 		return
 	}
 
-	accessToken, accessClaims, err := h.tokenMaker.CreateToken(user.ID, user.Email, user.IsAdmin, 15*time.Minute)
+	accessToken, accessClaims, err := h.services.CreateToken(user.ID, user.Email, user.IsAdmin, 15*time.Minute)
 	if err != nil {
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	refreshToken, refreshClaims, err := h.tokenMaker.CreateToken(user.ID, user.Email, user.IsAdmin, 24*time.Hour)
+	refreshToken, refreshClaims, err := h.services.CreateToken(user.ID, user.Email, user.IsAdmin, 24*time.Hour)
 	if err != nil {
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
 		return
@@ -67,12 +67,12 @@ func (h *Handler) login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("refresh_token", refreshToken, int(24*time.Hour.Seconds()), "/api/v1/auth", "", false, true)
+	c.SetCookie("refresh_token_uuid", session.ID, int(24*time.Hour.Seconds()), "/api/v1/auth", "", false, true)
+	c.SetCookie("session_id", session.ID, int(24*time.Hour.Seconds()), "/", "", false, true)
 
 	res := models.UserLoginRes{
-		SessionID:             session.ID,
-		AccessToken:           accessToken,
-		AccessTokenExpiresAt:  accessClaims.RegisteredClaims.ExpiresAt.Time,
+		AccessToken:          accessToken,
+		AccessTokenExpiresAt: accessClaims.RegisteredClaims.ExpiresAt.Time,
 		User: models.UserLogin{
 			Name:       user.Name,
 			Surname:    user.Surname,
@@ -114,7 +114,7 @@ func (h *Handler) renewAccessToken(c *gin.Context) {
 		return
 	}
 
-	refreshClaims, err := h.tokenMaker.VerifyToken(req.RefreshToken)
+	refreshClaims, err := h.services.VerifyRefreshToken(req.RefreshTokenUUID)
 	if err != nil {
 		newErrorResponce(c, http.StatusUnauthorized, "token verification failed")
 		return
@@ -136,14 +136,14 @@ func (h *Handler) renewAccessToken(c *gin.Context) {
 		return
 	}
 
-	accessToken, accessClaims, err := h.tokenMaker.CreateToken(refreshClaims.ID, refreshClaims.Email, refreshClaims.IsAdmin, 15*time.Minute)
-	if err != nil{
+	accessToken, accessClaims, err := h.services.CreateToken(refreshClaims.ID, refreshClaims.Email, refreshClaims.IsAdmin, 15*time.Minute)
+	if err != nil {
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
-		return 
+		return
 	}
 
 	res := models.RenewAccessTokenRes{
-		AccessToken: accessToken,
+		AccessToken:          accessToken,
 		AccessTokenExpiresAt: accessClaims.RegisteredClaims.ExpiresAt.Time,
 	}
 
@@ -172,37 +172,37 @@ func (h *Handler) revokeSession(c *gin.Context) {
 }
 
 func (h *Handler) authMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        authHeader := c.GetHeader("Authorization")
-        if authHeader == "" {
-            newErrorResponce(c, http.StatusUnauthorized, "missing authorization header")
-            c.Abort()
-            return
-        }
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			newErrorResponce(c, http.StatusUnauthorized, "missing authorization header")
+			c.Abort()
+			return
+		}
 
-        // Разделяем заголовок на части
-        parts := strings.SplitN(authHeader, " ", 2)
-        if len(parts) != 2 || parts[0] != "Bearer" {
-            newErrorResponce(c, http.StatusUnauthorized, "invalid authorization header format")
-            c.Abort()
-            return
-        }
-        accessToken := parts[1]
+		// Разделяем заголовок на части
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			newErrorResponce(c, http.StatusUnauthorized, "invalid authorization header format")
+			c.Abort()
+			return
+		}
+		accessToken := parts[1]
 
-        // Проверяем валидность токена
-        payload, err := h.tokenMaker.VerifyToken(accessToken)
-        if err != nil {
-            newErrorResponce(c, http.StatusUnauthorized, fmt.Sprintf("invalid token: %v", err))
-            c.Abort()
-            return
-        }
+		// Проверяем валидность токена
+		payload, err := h.services.VerifyAccessToken(accessToken)
+		if err != nil {
+			newErrorResponce(c, http.StatusUnauthorized, fmt.Sprintf("invalid token: %v", err))
+			c.Abort()
+			return
+		}
 
-        // Сохраняем информацию о пользователе в контексте
-        c.Set("user_id", payload.ID)
-        c.Set("email", payload.Email)
-        c.Set("is_admin", payload.IsAdmin)
+		// Сохраняем информацию о пользователе в контексте
+		c.Set("user_id", payload.ID)
+		c.Set("email", payload.Email)
+		c.Set("is_admin", payload.IsAdmin)
 
-        // Передаем управление следующему обработчику
-        c.Next()
-    }
+		// Передаем управление следующему обработчику
+		c.Next()
+	}
 }

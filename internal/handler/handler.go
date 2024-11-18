@@ -2,19 +2,16 @@ package handler
 
 import (
 	"github.com/Perseverance7/grady/internal/service"
-	"github.com/Perseverance7/grady/pkg/token"
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
 	services   *service.Service
-	tokenMaker *token.JWTMaker
 }
 
-func NewHandler(services *service.Service, secretKey string) *Handler {
+func NewHandler(services *service.Service) *Handler {
 	return &Handler{
 		services:   services,
-		tokenMaker: token.NewJWTMaker(secretKey),
 	}
 }
 

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"github.com/Perseverance7/grady/internal/models"
 	"github.com/Perseverance7/grady/internal/repository"
 )
@@ -9,6 +11,9 @@ type Authorization interface {
 	CreateUser(input models.UserRegisterReq) (models.UserRegisterRes, error)
 	GetUser(email, password string) (models.UserLogin, error)
 	UpdateUser(user *models.User) (*models.User, error)
+	CreateToken(id int64, email string, isAdmin bool, duration time.Duration) (string, *models.UserClaims, error)
+	VerifyAccessToken(tokenStr string) (*models.UserClaims, error)
+	VerifyRefreshToken(refreshTokenUUID string) (*models.UserClaims, error)
 	CreateSession(session *models.Session) (*models.Session, error)
 	GetSession(id string) (*models.Session, error)
 	RevokeSession(id string) error
@@ -39,9 +44,9 @@ type Service struct {
 	Statistics
 }
 
-func NewService(repo *repository.Repository) *Service {
+func NewService(repo *repository.Repository, secretKey []byte) *Service {
 	return &Service{
-		Authorization: NewAuthService(repo.Authorization),
+		Authorization: NewAuthService(repo.Authorization, secretKey),
 		Task:          NewTaskService(repo.Task),
 		Group:         NewGroupService(repo.Group),
 		Notification:  NewNotificationService(repo.Notification),

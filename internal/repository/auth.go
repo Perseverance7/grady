@@ -81,6 +81,18 @@ func (a *AuthRepository) GetUserSalt(email string) (string, error) {
 	return salt, nil
 }
 
+func (a *AuthRepository) GetRefreshToken(id string) (string, error) {
+	var refreshToken string
+	query := fmt.Sprintf("SELECT refresh_token FROM %s WHERE id=$1", tableSessions)
+
+	row := a.db.QueryRow(query, id)
+	if err := row.Scan(&refreshToken); err != nil {
+		return "", fmt.Errorf("error getting session %w", err)
+	}
+
+	return refreshToken, nil
+}
+
 func (a *AuthRepository) CreateSession(session *models.Session) (*models.Session, error) {
 	query := fmt.Sprintf("INSERT INTO %s (id, user_email, refresh_token, is_revoked, expires_at) VALUES ($1, $2, $3, $4, $5)", tableSessions)
 	_, err := a.db.Exec(query, session.ID, session.UserEmail, session.RefreshToken, session.IsRevoked, session.ExpiresAt)
@@ -97,7 +109,7 @@ func (a *AuthRepository) GetSession(id string) (*models.Session, error) {
 
 	row := a.db.QueryRow(query, id)
 	if err := row.Scan(&s.ID, &s.UserEmail, &s.RefreshToken, &s.IsRevoked, &s.CreatedAt, &s.ExpiresAt); err != nil {
-		return nil, fmt.Errorf("error gerring session %w", err)
+		return nil, fmt.Errorf("error getting session %w", err)
 	}
 
 	return &s, nil
