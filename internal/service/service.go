@@ -24,12 +24,15 @@ type Task interface {
 }
 
 type Group interface {
+	CreateGroup(group *models.CreateGroupReq) error
 }
 
 type Notification interface {
 }
 
 type Chat interface {
+	SendMessage(msg models.Message) error
+	GetChatHistory(groupID string, limit int) ([]models.Message, error)
 }
 
 type Statistics interface {

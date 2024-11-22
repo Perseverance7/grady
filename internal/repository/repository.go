@@ -11,7 +11,7 @@ type Authorization interface {
 	GetUserSalt(email string) (string, error)
 	GetRefreshToken(id string) (string, error)
 	UpdateUser(user *models.User) (*models.User, error)
-	DeleteUser(id int64) error 
+	DeleteUser(id int64) error
 	CreateSession(session *models.Session) (*models.Session, error)
 	GetSession(id string) (*models.Session, error)
 	RevokeSession(id string) error
@@ -22,12 +22,15 @@ type Task interface {
 }
 
 type Group interface {
+	CreateGroup(group *models.CreateGroupReq) error
 }
 
 type Notification interface {
 }
 
 type Chat interface {
+	SaveMessage(msg models.Message) error
+	GetMessagesByGroupId(groupID string, limit int) ([]models.Message, error) 
 }
 
 type Statistics interface {

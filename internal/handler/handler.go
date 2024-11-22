@@ -7,11 +7,13 @@ import (
 
 type Handler struct {
 	services   *service.Service
+	chatHandler *ChatHandler
 }
 
-func NewHandler(services *service.Service) *Handler {
+func NewHandler(services *service.Service, chatHandler *ChatHandler) *Handler {
 	return &Handler{
 		services:   services,
+		chatHandler: chatHandler,
 	}
 }
 
@@ -28,12 +30,6 @@ func (h *Handler) InitRouter() *gin.Engine {
 		auth.POST("/token/renew", h.renewAccessToken)
 		auth.POST("/session/revoke", h.revokeSession)
 	}
-
-	api.POST("/register", h.register)
-	api.POST("/login", h.login)
-	api.POST("/logout", h.logout)
-	api.POST("/token/renew", h.renewAccessToken)
-	api.POST("/session/revoke", h.revokeSession)
 
 	api.Use(h.authMiddleware())
 	
@@ -62,10 +58,9 @@ func (h *Handler) InitRouter() *gin.Engine {
 		}
 
 	
-		chat := group.Group("/:group_id/chat")
+		chat := group.Group("/chat")
 		{
-			chat.GET("/messages", h.getMessages)
-			chat.POST("/messages", h.sendMessage)
+			chat.GET("", h.chatHandler.WebSocketEndpoint)
 		}
 
 		

@@ -41,7 +41,8 @@ func main() {
 	
 	repo := repository.NewRepository(db)
 	services := service.NewService(repo, secretKey)
-	handlers := handler.NewHandler(services)
+	chatHandler := handler.NewChatHandler(services)
+	handlers := handler.NewHandler(services, chatHandler)
 
 	srv := new(models.Server)
 

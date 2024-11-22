@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const ctxUserKey = "user"
+
 func (h *Handler) register(c *gin.Context) {
 	var userReq models.UserRegisterReq
 
@@ -198,11 +200,28 @@ func (h *Handler) authMiddleware() gin.HandlerFunc {
 		}
 
 		// Сохраняем информацию о пользователе в контексте
-		c.Set("user_id", payload.ID)
-		c.Set("email", payload.Email)
-		c.Set("is_admin", payload.IsAdmin)
+		c.Set(ctxUserKey, &models.UserInfo{
+			ID:      payload.ID,
+			Email:   payload.Email,
+			IsAdmin: payload.IsAdmin,
+		})
 
 		// Передаем управление следующему обработчику
 		c.Next()
 	}
 }
+
+func getUserInfo(c *gin.Context) (*models.UserInfo, error) {
+	userInfo, exists := c.Get(ctxUserKey)
+	if !exists {
+		return nil, fmt.Errorf("user not found in context")
+	}
+
+	user, ok := userInfo.(*models.UserInfo)
+	if !ok {
+		return nil, fmt.Errorf("failed to cast user info")
+	}
+
+	return user, nil
+}
+

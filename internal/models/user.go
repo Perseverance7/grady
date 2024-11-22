@@ -13,6 +13,12 @@ type User struct {
 	Salt       string
 }
 
+type UserInfo struct {
+    ID      int64
+    Email   string
+    IsAdmin bool
+}
+
 type UserRegisterReq struct {
 	Name       string `json:"name" binding:"required"`
 	Surname    string `json:"surname" binding:"required"`
@@ -45,7 +51,6 @@ type UserLoginReq struct {
 }
 
 type UserLoginRes struct {
-	SessionID             string    `json:"session_id"`
 	AccessToken           string    `json:"access_token"`
 	AccessTokenExpiresAt  time.Time `json:"access_token_expires_at"`
 	User                  UserLogin `json:"user"`

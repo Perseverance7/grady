@@ -63,11 +63,8 @@ func (r *AuthRepository) UpdateUser(user *models.User) (*models.User, error) {
 func (r *AuthRepository) DeleteUser(id int64) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id=$1", tableUsers)
 	_, err := r.db.Exec(query, id)
-	if err != nil {
-		return fmt.Errorf("error deleting user: %w", err)
-	}
 
-	return nil
+	return err
 }
 
 func (a *AuthRepository) GetUserSalt(email string) (string, error) {
@@ -118,19 +115,13 @@ func (a *AuthRepository) GetSession(id string) (*models.Session, error) {
 func (a *AuthRepository) RevokeSession(id string) error {
 	query := fmt.Sprintf("UPDATE %s SET is_revoked=true WHERE id=$1", tableSessions)
 	_, err := a.db.Exec(query, id)
-	if err != nil {
-		return fmt.Errorf("error revoking session: %w", err)
-	}
 
-	return nil
+	return err
 }
 
 func (a *AuthRepository) DeleteSession(id string) error {
 	query := fmt.Sprintf("DELETE FROM %s WHERE id=$1", tableSessions)
 	_, err := a.db.Exec(query, id)
-	if err != nil {
-		return fmt.Errorf("error deleting session: %w", err)
-	}
 
-	return nil
+	return err
 }
