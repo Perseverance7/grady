@@ -1,32 +1,19 @@
 package handler
 
 import (
-	"sync"
-
-	"github.com/Perseverance7/grady/internal/models"
 	"github.com/Perseverance7/grady/internal/service"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 )
 
 type Handler struct {
 	services   *service.Service
-	clients   map[*websocket.Conn]chan models.Message // Каналы для каждого клиента
-	broadcast chan models.Message                     // Канал для общей рассылки
-	mu        sync.Mutex                              // Мьютекс для защиты clients
 }
 
 func NewHandler(services *service.Service) *Handler {
-	handler := &Handler{
+	return &Handler{
 		services:  services,
-		clients:   make(map[*websocket.Conn]chan models.Message),
-		broadcast: make(chan models.Message),
 	}
 
-	// Запускаем прослушивание канала broadcast в отдельной горутине
-	go handler.listenForMessages()
-
-	return handler
 }
 
 func (h *Handler) InitRouter() *gin.Engine {
@@ -72,7 +59,7 @@ func (h *Handler) InitRouter() *gin.Engine {
 	
 		chat := group.Group("/chat")
 		{
-			chat.GET("/", h.WebSocketEndpoint)
+			chat.GET("/")
 		}
 
 		

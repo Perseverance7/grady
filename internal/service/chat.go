@@ -17,18 +17,4 @@ func NewChatService(repo repository.Chat) *ChatService {
 	}
 }
 
-func (cs *ChatService) SendMessage(msg models.Message) error {
-	err := cs.repo.SaveMessage(msg)
-	if err != nil {
-		return err
-	}
-
-	cs.broadcast <- msg
-	return nil
-}
-
-func (cs *ChatService) GetChatHistory(groupID string, limit int) ([]models.Message, error) {
-	return cs.repo.GetMessagesByGroupId(groupID, limit)
-}
-
 

@@ -29,8 +29,6 @@ type Notification interface {
 }
 
 type Chat interface {
-	SaveMessage(msg models.Message) error
-	GetMessagesByGroupId(groupID string, limit int) ([]models.Message, error) 
 }
 
 type Statistics interface {
