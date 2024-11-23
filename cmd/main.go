@@ -12,18 +12,18 @@ import (
 	"github.com/Perseverance7/grady/internal/models"
 	"github.com/Perseverance7/grady/internal/repository"
 	"github.com/Perseverance7/grady/internal/service"
+	"github.com/Perseverance7/grady/pkg/logging"
 	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	
-	logrus.SetFormatter(new(logrus.JSONFormatter))
-	
+	logger := logging.GetLogger()
+	logger.Info("start main")
+
 	if err := godotenv.Load(); err != nil {
-		logrus.Fatalf("error with loading env variables: %s", err.Error())
+		logger.Fatalf("error with loading env variables: %s", err.Error())
 	}
-	
+
 	db, err := repository.NewPostgresDB(&repository.Config{
 		Host:     os.Getenv("DB_HOST"),
 		Port:     os.Getenv("DB_PORT"),
@@ -32,41 +32,40 @@ func main() {
 		DBName:   os.Getenv("DB_NAME"),
 		SSLMode:  os.Getenv("DB_SSL_MODE"),
 	})
-	
+
 	if err != nil {
-		logrus.Fatalf("db connect error %s", err.Error())
+		logger.Fatalf("db connect error %s", err.Error())
 	}
-	
+
 	var secretKey = []byte(os.Getenv("SECRET_KEY"))
-	
+
 	repo := repository.NewRepository(db)
 	services := service.NewService(repo, secretKey)
-	chatHandler := handler.NewChatHandler(services)
-	handlers := handler.NewHandler(services, chatHandler)
+	handlers := handler.NewHandler(services)
 
 	srv := new(models.Server)
 
 	go func() {
 		if err := srv.Run(os.Getenv("SERVER_HOST"), handlers.InitRouter()); err != nil && err != http.ErrServerClosed {
-			logrus.Fatalf("error running HTTP server: %s", err.Error())
+			logger.Fatalf("error running HTTP server: %s", err.Error())
 		}
 	}()
 
-	logrus.Print("Grady started")
+	logger.Print("Grady started")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 
-	logrus.Print("Grady shutting down")
+	logger.Print("Grady shutting down")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		logrus.Errorf("error occurred on server shutting down: %s", err.Error())
+		logger.Errorf("error occurred on server shutting down: %s", err.Error())
 	}
 
-	logrus.Print("Shutdown complete")
+	logger.Print("Shutdown complete")
 }

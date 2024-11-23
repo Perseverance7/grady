@@ -1,36 +1,16 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
+	"strings"
 
 	"github.com/Perseverance7/grady/internal/models"
-	"github.com/Perseverance7/grady/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
-
-type ChatHandler struct {
-	services  *service.Service
-	clients   map[*websocket.Conn]chan models.Message // Каналы для каждого клиента
-	broadcast chan models.Message                     // Канал для общей рассылки
-	mu        sync.Mutex                              // Мьютекс для защиты clients
-}
-
-func NewChatHandler(services *service.Service) *ChatHandler {
-	handler := &ChatHandler{
-		services:  services,
-		clients:   make(map[*websocket.Conn]chan models.Message),
-		broadcast: make(chan models.Message),
-	}
-
-	// Запускаем прослушивание канала broadcast в отдельной горутине
-	go handler.listenForMessages()
-
-	return handler
-}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -38,7 +18,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func (ch *ChatHandler) WebSocketEndpoint(c *gin.Context) {
+func (h *Handler) WebSocketEndpoint(c *gin.Context) {
 	groupID := c.Query("group_id")
 	if groupID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no group id"})
@@ -53,11 +33,36 @@ func (ch *ChatHandler) WebSocketEndpoint(c *gin.Context) {
 		return
 	}
 
-	history, err := ch.services.GetChatHistory(groupID, limit)
+	history, err := h.services.GetChatHistory(groupID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Проверка и извлечение токена из заголовков
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+		return
+	}
+
+	// Разделяем заголовок на части
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+		return
+	}
+	accessToken := parts[1]
+
+	// Проверка токена
+	payload, err := h.services.VerifyAccessToken(accessToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("invalid token: %v", err)})
+		return
+	}
+
+	// Извлекаем user_id из payload
+	userID := payload.ID
 
 	// Устанавливаем WebSocket-соединение
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -66,7 +71,7 @@ func (ch *ChatHandler) WebSocketEndpoint(c *gin.Context) {
 		return
 	}
 	defer func() {
-		ch.unregisterClient(conn)
+		h.unregisterClient(conn)
 		if err := conn.Close(); err != nil {
 			log.Printf("Error closing connection: %v", err)
 		}
@@ -80,31 +85,31 @@ func (ch *ChatHandler) WebSocketEndpoint(c *gin.Context) {
 
 	// Регистрируем клиента
 	clientChan := make(chan models.Message, 100) // Увеличен размер буфера
-	ch.registerClient(conn, clientChan)
+	h.registerClient(conn, clientChan)
 
 	// Горутинa для отправки сообщений клиенту
-	go ch.sendMessages(conn, clientChan)
+	go h.sendMessages(conn, clientChan)
 
 	// Читаем сообщения от клиента
-	ch.handleClientMessages(conn, groupID)
+	h.handleClientMessages(conn, groupID, userID)
 }
 
-func (ch *ChatHandler) registerClient(conn *websocket.Conn, clientChan chan models.Message) {
-	ch.mu.Lock()
-	ch.clients[conn] = clientChan
-	ch.mu.Unlock()
+func (h *Handler) registerClient(conn *websocket.Conn, clientChan chan models.Message) {
+	h.mu.Lock()
+	h.clients[conn] = clientChan
+	h.mu.Unlock()
 }
 
-func (ch *ChatHandler) unregisterClient(conn *websocket.Conn) {
-	ch.mu.Lock()
-	if clientChan, ok := ch.clients[conn]; ok {
+func (h *Handler) unregisterClient(conn *websocket.Conn) {
+	h.mu.Lock()
+	if clientChan, ok := h.clients[conn]; ok {
 		close(clientChan)
-		delete(ch.clients, conn)
+		delete(h.clients, conn)
 	}
-	ch.mu.Unlock()
+	h.mu.Unlock()
 }
 
-func (ch *ChatHandler) handleClientMessages(conn *websocket.Conn, groupID string) {
+func (h *Handler) handleClientMessages(conn *websocket.Conn, groupID string, userID int64) {
 	for {
 		var msg models.Message
 		if err := conn.ReadJSON(&msg); err != nil {
@@ -119,15 +124,17 @@ func (ch *ChatHandler) handleClientMessages(conn *websocket.Conn, groupID string
 
 		// Устанавливаем группу и отправляем сообщение в broadcast
 		msg.GroupID = groupID
-		if err := ch.services.SendMessage(msg); err != nil {
+		msg.UserID = userID
+
+		if err := h.services.SendMessage(msg); err != nil {
 			log.Printf("Failed to save message: %v", err)
 		} else {
-			ch.broadcast <- msg // Добавляем сообщение в общую рассылку
+			h.broadcast <- msg // Добавляем сообщение в общую рассылку
 		}
 	}
 }
 
-func (ch *ChatHandler) sendMessages(conn *websocket.Conn, clientChan chan models.Message) {
+func (h *Handler) sendMessages(conn *websocket.Conn, clientChan chan models.Message) {
 	for msg := range clientChan {
 		if err := conn.WriteJSON(msg); err != nil {
 			log.Printf("Error sending to client: %v", err)
@@ -135,23 +142,23 @@ func (ch *ChatHandler) sendMessages(conn *websocket.Conn, clientChan chan models
 		}
 	}
 	// Закрытие соединения после завершения работы
-	ch.unregisterClient(conn)
+	h.unregisterClient(conn)
 }
 
-func (ch *ChatHandler) listenForMessages() {
-	for msg := range ch.broadcast {
-		ch.mu.Lock()
-		for client, clientChan := range ch.clients {
+func (h *Handler) listenForMessages() {
+	for msg := range h.broadcast {
+		h.mu.Lock()
+		for client, clientChan := range h.clients {
 			select {
 			case clientChan <- msg:
 			default:
 				// Если клиент не читает, закрываем соединение
 				log.Printf("Client unresponsive, closing connection")
 				close(clientChan)
-				delete(ch.clients, client)
+				delete(h.clients, client)
 				client.Close()
 			}
 		}
-		ch.mu.Unlock()
+		h.mu.Unlock()
 	}
 }

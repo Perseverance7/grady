@@ -1,0 +1,3 @@
+time="2024-11-23T00:19:55-05:00" level=info msg="start main" func="main.main()" file="main.go:22"
+time="2024-11-23T00:23:40-05:00" level=info msg="start main" func="main.main()" file="main.go:21"
+time="2024-11-23T00:23:41-05:00" level=fatal msg="db connect error dial tcp: lookup port=: no such host" func="main.main()" file="main.go:37"
