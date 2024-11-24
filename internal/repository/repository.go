@@ -29,6 +29,9 @@ type Notification interface {
 }
 
 type Chat interface {
+	SaveMessage(message *models.Message) error
+	GetMessagesByGroup(groupID string) ([]models.Message, error)
+	GetUserData(userID int64) (models.Message, error)
 }
 
 type Statistics interface {

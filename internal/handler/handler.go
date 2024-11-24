@@ -59,7 +59,7 @@ func (h *Handler) InitRouter() *gin.Engine {
 	
 		chat := group.Group("/chat")
 		{
-			chat.GET("/")
+			chat.GET("/", h.webSocketHandler)
 		}
 
 		
