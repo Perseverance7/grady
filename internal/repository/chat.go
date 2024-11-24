@@ -23,7 +23,7 @@ func (r *ChatRepository) SaveMessage(message *models.Message) error {
 }
 
 // Получить сообщения для группы
-func (r *ChatRepository) GetMessagesByGroup(groupID string) ([]models.Message, error) {
+func (r *ChatRepository) GetMessagesByGroup(groupID string, limit, offset int) ([]models.Message, error) {
 	var messages []models.Message
 	query := fmt.Sprintf(`SELECT m.user_id AS user_id,
 	                             m.group_id AS group_id, 
@@ -36,8 +36,9 @@ func (r *ChatRepository) GetMessagesByGroup(groupID string) ([]models.Message, e
 								 LEFT JOIN %s u
 								 ON u.id = m.user_id
 								 WHERE m.group_id=$1
-								 ORDER BY m.sent_at DESC`, tableMessages, tableUsers)
-	err := r.db.Select(&messages, query, groupID)
+								 ORDER BY m.sent_at DESC
+								 LIMIT $2 OFFSET $3`, tableMessages, tableUsers)
+	err := r.db.Select(&messages, query, groupID, limit, offset)
 	return messages, err
 }
 
@@ -54,4 +55,13 @@ func (r *ChatRepository) GetUserData(userID int64) (models.Message, error) {
 	}
 
 	return messageData, nil
+}
+
+func (r *ChatRepository) IsUserInGroup(userID int64, groupID string) (bool, error) {
+	var exists bool
+	query := fmt.Sprintf(`SELECT EXISTS (
+		SELECT 1 FROM %s WHERE user_id = $1 AND group_id = $2
+	)`, tableGroupMembers)
+	err := r.db.QueryRow(query, userID, groupID).Scan(&exists)
+	return exists, err
 }

@@ -1,24 +1,16 @@
 package handler
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Perseverance7/grady/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
-
-type ChatHandler struct {
-	connections map[string]map[*websocket.Conn]bool
-}
-
-func NewChatHandler() *ChatHandler {
-	return &ChatHandler{
-		connections: make(map[string]map[*websocket.Conn]bool),
-	}
-}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -27,18 +19,26 @@ var upgrader = websocket.Upgrader{
 }
 
 func (h *Handler) webSocketHandler(c *gin.Context) {
-
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		log.Println("Upgrade error:", err)
-		return
-	}
-	defer conn.Close()
-
 	groupID := c.Query("group_id") // Получаем ID группы из маршрута
 	if groupID == "" {
 		log.Println("Group ID is required")
 		return
+	}
+
+	// Получаем параметр `limit`, с дефолтным значением 20
+	limitStr := c.DefaultQuery("limit", "20")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		log.Println("Invalid limit, using default value 20")
+		limit = 20
+	}
+
+	// Получаем параметр `offset`, с дефолтным значением 0
+	offsetStr := c.DefaultQuery("offset", "0")
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		log.Println("Invalid offset, using default value 0")
+		offset = 0
 	}
 
 	userInfo, exists := c.Get(ctxUserKey)
@@ -53,23 +53,42 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 		return
 	}
 
-	ch := NewChatHandler()
+	isInGroup, err := h.services.Chat.IsUserInGroup(user.ID, groupID)
+	if err != nil {
+		log.Println("Error checking group membership:", err)
+		return
+	}
+
+	if !isInGroup {
+		log.Println("User not authorized for this group")
+		newErrorResponce(c, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Println("Upgrade error:", err)
+		return
+	}
+	defer conn.Close()
+
+	if h.connections[groupID] == nil {
+		h.connections[groupID] = make(map[*websocket.Conn]bool)
+	}
+	h.connections[groupID][conn] = true
 
 	defer func() {
 		conn.Close()
-		delete(ch.connections[groupID], conn)
-		if len(ch.connections[groupID]) == 0 {
-			delete(ch.connections, groupID)
+		delete(h.connections[groupID], conn)
+		if len(h.connections[groupID]) == 0 {
+			delete(h.connections, groupID)
 		}
 	}()
 
-	if ch.connections[groupID] == nil {
-		ch.connections[groupID] = make(map[*websocket.Conn]bool)
-	}
-	ch.connections[groupID][conn] = true
+	
 
 	// Загружаем историю сообщений для группы
-	messages, err := h.services.Chat.GetChatHistory(groupID)
+	messages, err := h.services.Chat.GetChatHistory(groupID, limit, offset)
 	if err != nil {
 		log.Println("Failed to load chat history:", err)
 		return
@@ -90,9 +109,16 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 			log.Println("Read error:", err)
 			break
 		}
-		
+
+		var incomingMsg models.IncomingMessage
+		err = json.Unmarshal(messageContent, &incomingMsg)
+		if err != nil {
+			log.Println("JSON Unmarshal error:", err)
+			break
+		}
+
 		userData, err := h.services.GetUserData(user.ID)
-		if err != nil{
+		if err != nil {
 			log.Println("Getting user data error: %w", err)
 			break
 		}
@@ -103,7 +129,7 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 			Name:       userData.Name,
 			Surname:    userData.Surname,
 			Patronymic: userData.Patronymic,
-			Content:    string(messageContent),
+			Content:    incomingMsg.Content,
 			SentAt:     time.Now(),
 		}
 
@@ -115,21 +141,21 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 		}
 
 		// Здесь можно добавить логику для рассылки сообщения другим клиентам через вебсокет-соединения.
-		h.broadcastMessageToGroup(ch, groupID, &message)
+		h.broadcastMessageToGroup(groupID, &message)
 	}
 }
 
-func (h *Handler) broadcastMessageToGroup(ch *ChatHandler, groupID string, message *models.Message) {
-	if ch.connections[groupID] == nil {
+func (h *Handler) broadcastMessageToGroup(groupID string, message *models.Message) {
+	if h.connections[groupID] == nil {
 		return
 	}
 
-	for conn := range ch.connections[groupID] {
+	for conn := range h.connections[groupID] {
 		err := conn.WriteJSON(message)
 		if err != nil {
 			log.Printf("Error sending message to group %s: %v\n", groupID, err)
 			conn.Close()
-			delete(ch.connections[groupID], conn)
+			delete(h.connections[groupID], conn)
 		}
 	}
 }

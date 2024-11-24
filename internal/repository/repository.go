@@ -30,8 +30,9 @@ type Notification interface {
 
 type Chat interface {
 	SaveMessage(message *models.Message) error
-	GetMessagesByGroup(groupID string) ([]models.Message, error)
+	GetMessagesByGroup(groupID string, limit, offset int) ([]models.Message, error)
 	GetUserData(userID int64) (models.Message, error)
+	IsUserInGroup(userID int64, groupID string) (bool, error)
 }
 
 type Statistics interface {

@@ -3,15 +3,18 @@ package handler
 import (
 	"github.com/Perseverance7/grady/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 type Handler struct {
-	services   *service.Service
+	services    *service.Service
+	connections map[string]map[*websocket.Conn]bool
 }
 
 func NewHandler(services *service.Service) *Handler {
 	return &Handler{
-		services:  services,
+		services:    services,
+		connections: make(map[string]map[*websocket.Conn]bool),
 	}
 
 }
@@ -31,7 +34,7 @@ func (h *Handler) InitRouter() *gin.Engine {
 	}
 
 	api.Use(h.authMiddleware())
-	
+
 	user := api.Group("/users/me")
 	{
 		user.GET("/", h.getUserProfile)
@@ -46,7 +49,6 @@ func (h *Handler) InitRouter() *gin.Engine {
 		group.POST("/:group_id/add_member", h.joinMember)
 		group.DELETE("/:group_id/remove_member", h.removeMember)
 
-
 		tasks := group.Group("/:group_id/tasks")
 		{
 			tasks.POST("/", h.createTask)
@@ -56,13 +58,11 @@ func (h *Handler) InitRouter() *gin.Engine {
 			tasks.GET("/:task_id/results", h.getTaskResults)
 		}
 
-	
 		chat := group.Group("/chat")
 		{
 			chat.GET("/", h.webSocketHandler)
 		}
 
-		
 		stats := group.Group("/:group_id/stats")
 		{
 			stats.GET("/", h.getGroupStats)
@@ -72,7 +72,7 @@ func (h *Handler) InitRouter() *gin.Engine {
 	notifications := api.Group("/notifications")
 	{
 		notifications.GET("/", h.listNotifications)
-		notifications.POST("/", h.sendNotification) 
+		notifications.POST("/", h.sendNotification)
 		notifications.POST("/read", h.markNotificationsAsRead)
 	}
 

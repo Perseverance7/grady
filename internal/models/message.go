@@ -11,3 +11,7 @@ type Message struct {
 	Content    string    `json:"content" db:"content"`
 	SentAt     time.Time `json:"sent_at" db:"sent_at"`
 }
+
+type IncomingMessage struct {
+	Content string `json:"content"`
+}

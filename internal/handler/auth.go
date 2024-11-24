@@ -44,13 +44,19 @@ func (h *Handler) login(c *gin.Context) {
 		return
 	}
 
-	accessToken, accessClaims, err := h.services.CreateToken(user.ID, user.Email, user.IsAdmin, 15*time.Minute)
+	accessToken, accessClaims, err := h.services.CreateToken(user.ID, 
+														     user.Email, 
+															 user.IsAdmin, 
+															 24*time.Hour)
 	if err != nil {
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	refreshToken, refreshClaims, err := h.services.CreateToken(user.ID, user.Email, user.IsAdmin, 24*time.Hour)
+	refreshToken, refreshClaims, err := h.services.CreateToken(user.ID, 
+		                           							   user.Email, 
+															   user.IsAdmin, 
+															   7*24*time.Hour)
 	if err != nil {
 		newErrorResponce(c, http.StatusInternalServerError, err.Error())
 		return
@@ -224,4 +230,3 @@ func getUserInfo(c *gin.Context) (*models.UserInfo, error) {
 
 	return user, nil
 }
-
