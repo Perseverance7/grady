@@ -19,9 +19,26 @@ func NewAuthRepository(db *sqlx.DB) *AuthRepository {
 
 func (r *AuthRepository) CreateUser(userReq models.UserRegisterReq) (models.UserRegisterRes, error) {
 	var userRes models.UserRegisterRes
-	query := fmt.Sprintf(`INSERT INTO %s (name, surname, patronymic, email, password_hash, password_salt) 
-						  VALUES ($1, $2, $3, $4, $5, $6) 
-						  RETURNING name, surname, patronymic, email, is_admin`, tableUsers)
+	
+	query := fmt.Sprintf(`
+    INSERT INTO %s (
+        name, 
+        surname, 
+        patronymic, 
+        email, 
+        password_hash, 
+        password_salt
+    ) 
+    VALUES (
+        $1, $2, $3, $4, $5, $6
+    ) 
+    RETURNING 
+        name, 
+        surname, 
+        patronymic, 
+        email, 
+        is_admin
+    `, tableUsers)
 
 	row := r.db.QueryRow(query,
 		userReq.Name,
@@ -39,7 +56,21 @@ func (r *AuthRepository) CreateUser(userReq models.UserRegisterReq) (models.User
 
 func (r *AuthRepository) GetUser(email, password string) (models.UserLogin, error) {
 	var user models.UserLogin
-	query := fmt.Sprintf("SELECT id, name, surname, patronymic, email, is_admin FROM %s WHERE email=$1 AND password_hash=$2", tableUsers)
+	
+	query := fmt.Sprintf(`
+    SELECT 
+        id, 
+        name, 
+        surname, 
+        patronymic, 
+        email, 
+        is_admin 
+    FROM 
+        %s 
+    WHERE 
+        email = $1 AND 
+        password_hash = $2
+	`, tableUsers)
 
 	row := r.db.QueryRow(query, email, password)
 
@@ -51,7 +82,17 @@ func (r *AuthRepository) GetUser(email, password string) (models.UserLogin, erro
 }
 
 func (r *AuthRepository) UpdateUser(user *models.User) (*models.User, error) {
-	query := fmt.Sprintf("UPDATE %s SET name=$1, surname=$2, patronymic=$3, password_hash=$4 WHERE id=$5", tableUsers)
+	query := fmt.Sprintf(`
+    UPDATE %s 
+    SET 
+        name = $1, 
+        surname = $2, 
+        patronymic = $3, 
+        password_hash = $4 
+    WHERE 
+        id = $5
+	`, tableUsers)
+	
 	_, err := r.db.Exec(query, user.Name, user.Surname, user.Patronymic, user.Password, user.ID)
 	if err != nil {
 		return nil, err
@@ -61,7 +102,7 @@ func (r *AuthRepository) UpdateUser(user *models.User) (*models.User, error) {
 }
 
 func (r *AuthRepository) DeleteUser(id int64) error {
-	query := fmt.Sprintf("DELETE FROM %s WHERE id=$1", tableUsers)
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id=$1`, tableUsers)
 	_, err := r.db.Exec(query, id)
 
 	return err
@@ -69,7 +110,7 @@ func (r *AuthRepository) DeleteUser(id int64) error {
 
 func (a *AuthRepository) GetUserSalt(email string) (string, error) {
 	var salt string
-	query := fmt.Sprintf("SELECT password_salt FROM %s WHERE email=$1", tableUsers)
+	query := fmt.Sprintf(`SELECT password_salt FROM %s WHERE email=$1`, tableUsers)
 	row := a.db.QueryRow(query, email)
 	if err := row.Scan(&salt); err != nil {
 		return "", err
@@ -80,7 +121,7 @@ func (a *AuthRepository) GetUserSalt(email string) (string, error) {
 
 func (a *AuthRepository) GetRefreshToken(id string) (string, error) {
 	var refreshToken string
-	query := fmt.Sprintf("SELECT refresh_token FROM %s WHERE id=$1", tableSessions)
+	query := fmt.Sprintf(`SELECT refresh_token FROM %s WHERE id=$1`, tableSessions)
 
 	row := a.db.QueryRow(query, id)
 	if err := row.Scan(&refreshToken); err != nil {
@@ -91,7 +132,19 @@ func (a *AuthRepository) GetRefreshToken(id string) (string, error) {
 }
 
 func (a *AuthRepository) CreateSession(session *models.Session) (*models.Session, error) {
-	query := fmt.Sprintf("INSERT INTO %s (id, user_email, refresh_token, is_revoked, expires_at) VALUES ($1, $2, $3, $4, $5)", tableSessions)
+	query := fmt.Sprintf(`
+    INSERT INTO %s (
+        id, 
+        user_email, 
+        refresh_token, 
+        is_revoked, 
+        expires_at
+    ) 
+    VALUES (
+        $1, $2, $3, $4, $5
+    )
+	`, tableSessions)
+
 	_, err := a.db.Exec(query, session.ID, session.UserEmail, session.RefreshToken, session.IsRevoked, session.ExpiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("error inserting session %w", err)
@@ -102,7 +155,7 @@ func (a *AuthRepository) CreateSession(session *models.Session) (*models.Session
 
 func (a *AuthRepository) GetSession(id string) (*models.Session, error) {
 	var s models.Session
-	query := fmt.Sprintf("SELECT * FROM %s WHERE id=$1", tableSessions)
+	query := fmt.Sprintf(`SELECT * FROM %s WHERE id=$1`, tableSessions)
 
 	row := a.db.QueryRow(query, id)
 	if err := row.Scan(&s.ID, &s.UserEmail, &s.RefreshToken, &s.IsRevoked, &s.CreatedAt, &s.ExpiresAt); err != nil {
@@ -113,14 +166,14 @@ func (a *AuthRepository) GetSession(id string) (*models.Session, error) {
 }
 
 func (a *AuthRepository) RevokeSession(id string) error {
-	query := fmt.Sprintf("UPDATE %s SET is_revoked=true WHERE id=$1", tableSessions)
+	query := fmt.Sprintf(`UPDATE %s SET is_revoked=true WHERE id=$1`, tableSessions)
 	_, err := a.db.Exec(query, id)
 
 	return err
 }
 
 func (a *AuthRepository) DeleteSession(id string) error {
-	query := fmt.Sprintf("DELETE FROM %s WHERE id=$1", tableSessions)
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id=$1`, tableSessions)
 	_, err := a.db.Exec(query, id)
 
 	return err

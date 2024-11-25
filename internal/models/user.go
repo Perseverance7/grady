@@ -14,9 +14,9 @@ type User struct {
 }
 
 type UserInfo struct {
-    ID      int64
-    Email   string
-    IsAdmin bool
+	ID      int64
+	Email   string
+	IsAdmin bool
 }
 
 type UserRegisterReq struct {
@@ -51,9 +51,9 @@ type UserLoginReq struct {
 }
 
 type UserLoginRes struct {
-	AccessToken           string    `json:"access_token"`
-	AccessTokenExpiresAt  time.Time `json:"access_token_expires_at"`
-	User                  UserLogin `json:"user"`
+	AccessToken          string    `json:"access_token"`
+	AccessTokenExpiresAt time.Time `json:"access_token_expires_at"`
+	User                 UserLogin `json:"user"`
 }
 
 type RenewAccessTokenReq struct {
@@ -64,4 +64,3 @@ type RenewAccessTokenRes struct {
 	AccessToken          string    `json:"access_token"`
 	AccessTokenExpiresAt time.Time `json:"access_token_expires_at"`
 }
-

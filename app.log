@@ -1,0 +1,4 @@
+{"level":"info","time":"2024-11-25T09:24:02.919-0500","message":"Grady started"}
+{"level":"info","time":"2024-11-25T09:24:10.923-0500","message":"Grady shutting down..."}
+{"level":"info","time":"2024-11-25T09:24:10.923-0500","message":"Shutdown complete"}
+{"level":"fatal","time":"2024-11-25T09:24:28.674-0500","message":"db connect error","error":"pq: password authentication failed for user \"anton\""}

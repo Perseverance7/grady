@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -19,13 +20,12 @@ var upgrader = websocket.Upgrader{
 }
 
 func (h *Handler) webSocketHandler(c *gin.Context) {
-	groupID := c.Query("group_id") // Получаем ID группы из маршрута
+	groupID := c.Query("group_id")
 	if groupID == "" {
 		log.Println("Group ID is required")
 		return
 	}
 
-	// Получаем параметр `limit`, с дефолтным значением 20
 	limitStr := c.DefaultQuery("limit", "20")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
@@ -33,7 +33,6 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 		limit = 20
 	}
 
-	// Получаем параметр `offset`, с дефолтным значением 0
 	offsetStr := c.DefaultQuery("offset", "0")
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil || offset < 0 {
@@ -61,7 +60,7 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 
 	if !isInGroup {
 		log.Println("User not authorized for this group")
-		newErrorResponce(c, http.StatusForbidden, "forbidden")
+		newErrorResponce(c, http.StatusForbidden, errors.New("forbidden"))
 		return
 	}
 
@@ -85,9 +84,6 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 		}
 	}()
 
-	
-
-	// Загружаем историю сообщений для группы
 	messages, err := h.services.Chat.GetChatHistory(groupID, limit, offset)
 	if err != nil {
 		log.Println("Failed to load chat history:", err)
@@ -103,7 +99,6 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 	}
 
 	for {
-		// Чтение сообщения от клиента
 		_, messageContent, err := conn.ReadMessage()
 		if err != nil {
 			log.Println("Read error:", err)
@@ -133,14 +128,12 @@ func (h *Handler) webSocketHandler(c *gin.Context) {
 			SentAt:     time.Now(),
 		}
 
-		// Сохраняем сообщение и отправляем остальным
 		err = h.services.Chat.SendMessage(&message)
 		if err != nil {
 			log.Println("SendMessage error:", err)
 			break
 		}
 
-		// Здесь можно добавить логику для рассылки сообщения другим клиентам через вебсокет-соединения.
 		h.broadcastMessageToGroup(groupID, &message)
 	}
 }

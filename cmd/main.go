@@ -12,16 +12,16 @@ import (
 	"github.com/Perseverance7/grady/internal/models"
 	"github.com/Perseverance7/grady/internal/repository"
 	"github.com/Perseverance7/grady/internal/service"
-	"github.com/Perseverance7/grady/pkg/logging"
+	"github.com/Perseverance7/grady/pkg/logger"
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
 func main() {
-	logger := logging.GetLogger()
-	logger.Info("start main")
+	logger := logger.NewLogger("app.log")
 
 	if err := godotenv.Load(); err != nil {
-		logger.Fatalf("error with loading env variables: %s", err.Error())
+		logger.Fatal("error with loading env variables", zap.Error(err))
 	}
 
 	db, err := repository.NewPostgresDB(&repository.Config{
@@ -34,38 +34,38 @@ func main() {
 	})
 
 	if err != nil {
-		logger.Fatalf("db connect error %s", err.Error())
+		logger.Fatal("db connect error", zap.Error(err))
 	}
 
 	var secretKey = []byte(os.Getenv("SECRET_KEY"))
 
 	repo := repository.NewRepository(db)
 	services := service.NewService(repo, secretKey)
-	handlers := handler.NewHandler(services)
+	handlers := handler.NewHandler(logger, services)
 
 	srv := new(models.Server)
 
 	go func() {
 		if err := srv.Run(os.Getenv("SERVER_HOST"), handlers.InitRouter()); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("error running HTTP server: %s", err.Error())
+			logger.Fatal("error running HTTP server", zap.Error(err))
 		}
 	}()
 
-	logger.Print("Grady started")
+	logger.Info("Grady started")
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 
-	logger.Print("Grady shutting down")
+	logger.Info("Grady shutting down...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Errorf("error occurred on server shutting down: %s", err.Error())
+		logger.Fatal("error with shutting down server`", zap.Error(err))
 	}
 
-	logger.Print("Shutdown complete")
+	logger.Info("Shutdown complete")
 }

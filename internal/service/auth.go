@@ -157,7 +157,6 @@ func GenerateSalt() (string, error) {
 	return base64.StdEncoding.EncodeToString(salt), nil
 }
 
-// HashPassword - функция для хеширования пароля с использованием соли
 func HashPassword(password, salt string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(password + salt))

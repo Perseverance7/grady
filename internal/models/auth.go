@@ -21,7 +21,6 @@ type LogoutRequest struct {
 	SessionID string `json:"session_id"`
 }
 
-
 type UserClaims struct {
 	ID      int64  `json:"id"`
 	Email   string `json:"email"`

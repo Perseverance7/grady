@@ -1,18 +1,25 @@
 package handler
 
 import (
+	"time"
+
+	"github.com/gin-contrib/gzip"
+
 	"github.com/Perseverance7/grady/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 )
 
 type Handler struct {
+	logger      *zap.Logger
 	services    *service.Service
 	connections map[string]map[*websocket.Conn]bool
 }
 
-func NewHandler(services *service.Service) *Handler {
+func NewHandler(logger *zap.Logger, services *service.Service) *Handler {
 	return &Handler{
+		logger:      logger,
 		services:    services,
 		connections: make(map[string]map[*websocket.Conn]bool),
 	}
@@ -21,6 +28,9 @@ func NewHandler(services *service.Service) *Handler {
 
 func (h *Handler) InitRouter() *gin.Engine {
 	r := gin.Default()
+
+	r.Use(gzip.Gzip(gzip.BestSpeed))
+	r.Use(LoggerMiddleware(h.logger))
 
 	api := r.Group("/api/v1")
 
@@ -77,4 +87,38 @@ func (h *Handler) InitRouter() *gin.Engine {
 	}
 
 	return r
+}
+
+func LoggerMiddleware(logger *zap.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		startTime := time.Now()
+
+		c.Next()
+
+		statusCode := c.Writer.Status()
+		errMessage := ""
+		if len(c.Errors) > 0 {
+			errMessage = c.Errors.String()
+		}
+
+		var logFunc func(msg string, fields ...zap.Field)
+		switch {
+		case statusCode >= 500:
+			logFunc = logger.Error
+		case statusCode >= 400:
+			logFunc = logger.Warn
+		default:
+			logFunc = logger.Info
+		}
+
+		// Логируем завершение запроса
+		logFunc("HTTP-запрос",
+			zap.String("method", c.Request.Method),
+			zap.String("path", c.Request.URL.Path),
+			zap.Int("status", statusCode),
+			zap.Duration("duration", time.Since(startTime)),
+			zap.String("client_ip", c.ClientIP()),
+			zap.String("error", errMessage),
+		)
+	}
 }

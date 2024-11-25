@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -16,13 +17,13 @@ func (h *Handler) register(c *gin.Context) {
 	var userReq models.UserRegisterReq
 
 	if err := c.BindJSON(&userReq); err != nil {
-		newErrorResponce(c, http.StatusBadRequest, "invalid input body")
+		newErrorResponce(c, http.StatusBadRequest, errors.New("invalid input body"))
 		return
 	}
 
 	userRes, err := h.services.Authorization.CreateUser(userReq)
 	if err != nil {
-		newErrorResponce(c, http.StatusConflict, err.Error())
+		newErrorResponce(c, http.StatusConflict, err)
 		return
 	}
 
@@ -34,31 +35,31 @@ func (h *Handler) register(c *gin.Context) {
 func (h *Handler) login(c *gin.Context) {
 	var userReq models.UserLoginReq
 	if err := c.BindJSON(&userReq); err != nil {
-		newErrorResponce(c, http.StatusBadRequest, err.Error())
+		newErrorResponce(c, http.StatusBadRequest, err)
 		return
 	}
 
 	user, err := h.services.GetUser(userReq.Email, userReq.Password)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
-	accessToken, accessClaims, err := h.services.CreateToken(user.ID, 
-														     user.Email, 
-															 user.IsAdmin, 
-															 24*time.Hour)
+	accessToken, accessClaims, err := h.services.CreateToken(user.ID,
+		user.Email,
+		user.IsAdmin,
+		24*time.Hour)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
-	refreshToken, refreshClaims, err := h.services.CreateToken(user.ID, 
-		                           							   user.Email, 
-															   user.IsAdmin, 
-															   7*24*time.Hour)
+	refreshToken, refreshClaims, err := h.services.CreateToken(user.ID,
+		user.Email,
+		user.IsAdmin,
+		7*24*time.Hour)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -71,12 +72,27 @@ func (h *Handler) login(c *gin.Context) {
 	})
 
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
-	c.SetCookie("refresh_token_uuid", session.ID, int(24*time.Hour.Seconds()), "/api/v1/auth", "", false, true)
-	c.SetCookie("session_id", session.ID, int(24*time.Hour.Seconds()), "/", "", false, true)
+	c.SetCookie("refresh_token_uuid",
+		session.ID,
+		int(24*time.Hour.Seconds()),
+		"/api/v1/auth",
+		"",
+		false,
+		true)
+	// secure поменять при переходе на https
+
+	c.SetCookie("session_id",
+		session.ID,
+		int(24*time.Hour.Seconds()),
+		"/",
+		"",
+		false,
+		true)
+	// secure поменять при переходе на https
 
 	res := models.UserLoginRes{
 		AccessToken:          accessToken,
@@ -97,18 +113,18 @@ func (h *Handler) login(c *gin.Context) {
 func (h *Handler) logout(c *gin.Context) {
 	var req models.LogoutRequest
 	if err := c.BindJSON(&req); err != nil {
-		newErrorResponce(c, http.StatusBadRequest, err.Error())
+		newErrorResponce(c, http.StatusBadRequest, err)
 		return
 	}
 
 	if req.SessionID == "" {
-		newErrorResponce(c, http.StatusBadRequest, "missing session ID")
+		newErrorResponce(c, http.StatusBadRequest, errors.New("missing session ID"))
 		return
 	}
 
 	err := h.services.DeleteSession(req.SessionID)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -118,35 +134,35 @@ func (h *Handler) logout(c *gin.Context) {
 func (h *Handler) renewAccessToken(c *gin.Context) {
 	var req models.RenewAccessTokenReq
 	if err := c.BindJSON(&req); err != nil {
-		newErrorResponce(c, http.StatusBadRequest, err.Error())
+		newErrorResponce(c, http.StatusBadRequest, err)
 		return
 	}
 
 	refreshClaims, err := h.services.VerifyRefreshToken(req.RefreshTokenUUID)
 	if err != nil {
-		newErrorResponce(c, http.StatusUnauthorized, "token verification failed")
+		newErrorResponce(c, http.StatusUnauthorized, errors.New("token verification failed"))
 		return
 	}
 
 	session, err := h.services.GetSession(refreshClaims.RegisteredClaims.ID)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
 	if session.IsRevoked {
-		newErrorResponce(c, http.StatusUnauthorized, "session is revoked")
+		newErrorResponce(c, http.StatusUnauthorized, errors.New("session is revoked"))
 		return
 	}
 
 	if session.UserEmail != refreshClaims.Email {
-		newErrorResponce(c, http.StatusUnauthorized, "inappropriate email address")
+		newErrorResponce(c, http.StatusUnauthorized, errors.New("inappropriate email address"))
 		return
 	}
 
 	accessToken, accessClaims, err := h.services.CreateToken(refreshClaims.ID, refreshClaims.Email, refreshClaims.IsAdmin, 15*time.Minute)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -161,18 +177,18 @@ func (h *Handler) renewAccessToken(c *gin.Context) {
 func (h *Handler) revokeSession(c *gin.Context) {
 	var req models.LogoutRequest
 	if err := c.BindJSON(&req); err != nil {
-		newErrorResponce(c, http.StatusBadRequest, err.Error())
+		newErrorResponce(c, http.StatusBadRequest, err)
 		return
 	}
 
 	if req.SessionID == "" {
-		newErrorResponce(c, http.StatusBadRequest, "missing session ID")
+		newErrorResponce(c, http.StatusBadRequest, errors.New("missing session ID"))
 		return
 	}
 
 	err := h.services.RevokeSession(req.SessionID)
 	if err != nil {
-		newErrorResponce(c, http.StatusInternalServerError, err.Error())
+		newErrorResponce(c, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -183,36 +199,32 @@ func (h *Handler) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			newErrorResponce(c, http.StatusUnauthorized, "missing authorization header")
+			newErrorResponce(c, http.StatusUnauthorized, errors.New("missing authorization header"))
 			c.Abort()
 			return
 		}
 
-		// Разделяем заголовок на части
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			newErrorResponce(c, http.StatusUnauthorized, "invalid authorization header format")
+			newErrorResponce(c, http.StatusUnauthorized, errors.New("invalid authorization header format"))
 			c.Abort()
 			return
 		}
 		accessToken := parts[1]
 
-		// Проверяем валидность токена
 		payload, err := h.services.VerifyAccessToken(accessToken)
 		if err != nil {
-			newErrorResponce(c, http.StatusUnauthorized, fmt.Sprintf("invalid token: %v", err))
+			newErrorResponce(c, http.StatusUnauthorized, err)
 			c.Abort()
 			return
 		}
 
-		// Сохраняем информацию о пользователе в контексте
 		c.Set(ctxUserKey, &models.UserInfo{
 			ID:      payload.ID,
 			Email:   payload.Email,
 			IsAdmin: payload.IsAdmin,
 		})
 
-		// Передаем управление следующему обработчику
 		c.Next()
 	}
 }
