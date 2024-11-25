@@ -7,6 +7,7 @@ import (
 )
 
 func NewLogger(logFile string) *zap.Logger {
+	// Настройка ротации файлов
 	lumberjackLogger := &lumberjack.Logger{
 		Filename:   logFile,
 		MaxSize:    10, // Максимальный размер файла в MB
